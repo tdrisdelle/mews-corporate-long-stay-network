@@ -23,9 +23,7 @@ A B2B brokerage marketplace built as a façade on top of the Mews Connector API.
 
 ## Deployed URLs
 
-> Add Railway URLs here after deployment
-
-- **Frontend:** https://web-production.up.railway.app
+- **Frontend:** https://web-production-b7d05.up.railway.app
 - **Resident Platform:** https://resident-platform-production.up.railway.app
 - **Mock Mews API:** https://mock-mews-api-production.up.railway.app
 
