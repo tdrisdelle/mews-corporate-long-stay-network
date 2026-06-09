@@ -41,7 +41,7 @@ interface Property {
 
 interface Buyer {
   id: string;
-  name: string;
+  legal_name: string;
 }
 
 const LEASE_STATE_COLORS: Record<string, { bg: string; text: string; label: string }> = {

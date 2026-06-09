@@ -414,7 +414,7 @@ export default function BookerPage() {
                   {property.photo_url ? (
                     <img
                       src={property.photo_url}
-                      alt={property.name}
+                      alt={property.legal_name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
@@ -508,7 +508,7 @@ export default function BookerPage() {
                         <div className="flex items-center gap-2 mb-1">
                           <StateBadge state={lease.state} />
                           {prop && (
-                            <span className="text-sm font-semibold text-gray-900">{prop.name}</span>
+                            <span className="text-sm font-semibold text-gray-900">{prop.legal_name}</span>
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mt-2">

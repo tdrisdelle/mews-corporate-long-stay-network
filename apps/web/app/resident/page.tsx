@@ -176,7 +176,7 @@ export default function ResidentPage() {
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load resident data");
         // Use demo data as fallback
-        setResident({ id: residentId, name: "Maria Santos", email: "maria@stanford.edu" });
+        setResident({ id: residentId, full_name: "Maria Santos", email: "maria@stanford.edu" });
       } finally {
         setLoading(false);
       }
