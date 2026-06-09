@@ -565,7 +565,7 @@ export default function BookerPage() {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreatePanel(false)} />
           <div className="relative bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
             {/* Panel header */}
-            <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between rounded-t-3xl sm:rounded-t-2xl">
+            <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between rounded-t-3xl sm:rounded-t-2xl">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Create Lease</h2>
                 <p className="text-sm text-gray-500">{selectedProperty.name} · {selectedProperty.metro}</p>
