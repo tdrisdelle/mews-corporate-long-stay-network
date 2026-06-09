@@ -36,7 +36,7 @@ interface Property {
   rate_floor_cents: number;
   total_units: number;
   accepts_network_bookings: boolean;
-  max_exposure_pct?: number;
+  max_network_exposure_pct?: number;
 }
 
 interface Buyer {
@@ -192,7 +192,7 @@ export default function OperatorPage() {
               <div className="space-y-4">
                 <SettingRow label="Rate Floor" value={formatCents(property?.rate_floor_cents || 0) + "/mo"} />
                 <SettingRow label="Total Units" value={String(property?.total_units || 0)} />
-                <SettingRow label="Max Exposure" value={`${property?.max_exposure_pct || 25}%`} />
+                <SettingRow label="Max Exposure" value={`${property?.max_network_exposure_pct || 25}%`} />
                 <SettingRow label="Jurisdiction" value={property?.jurisdiction || "—"} />
               </div>
 

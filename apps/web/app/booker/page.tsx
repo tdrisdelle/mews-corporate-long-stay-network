@@ -180,9 +180,9 @@ export default function BookerPage() {
     try {
       const params = new URLSearchParams({
         metro,
-        start: startDate,
-        end: endDate,
-        units: String(unitCount),
+        start_date: startDate,
+        end_date: endDate,
+        unit_count: String(unitCount),
       });
       const data = await apiGet(`/api/properties/search?${params}`);
       setProperties(Array.isArray(data) ? data : data.properties || []);
@@ -245,7 +245,7 @@ export default function BookerPage() {
     if (!extendLease || !extendDate) return;
     setExtending(true);
     try {
-      await apiPost(`/api/leases/${extendLease.id}/extend`, { new_end_date: extendDate });
+      await apiPost(`/api/leases/${extendLease.id}/extend`, { new_end: extendDate });
       setExtendLease(null);
       await fetchLeases();
     } catch (e) {

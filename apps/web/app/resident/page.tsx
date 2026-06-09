@@ -23,7 +23,7 @@ import {
 
 interface Resident {
   id: string;
-  name: string;
+  full_name: string;
   email?: string;
   phone?: string;
 }
@@ -188,7 +188,7 @@ export default function ResidentPage() {
     if (!selectedLease || !extendDate) return;
     setExtending(true);
     try {
-      await apiPost(`/api/leases/${selectedLease.id}/extend`, { new_end_date: extendDate });
+      await apiPost(`/api/leases/${selectedLease.id}/extend`, { new_end: extendDate });
       setExtendSuccess(true);
       const updated = await apiGet(`/api/residents/${residentId}/leases`);
       const leaseList: Lease[] = Array.isArray(updated) ? updated : updated.leases || [];
@@ -218,7 +218,7 @@ export default function ResidentPage() {
     );
   }
 
-  const displayResident = resident || { id: residentId, name: "Maria Santos" };
+  const displayResident = resident || { id: residentId, full_name: "Maria Santos" };
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FAF9F6" }}>
@@ -227,9 +227,9 @@ export default function ResidentPage() {
         <div className="max-w-lg mx-auto text-center">
           {/* Avatar */}
           <div className="mx-auto w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-white text-2xl font-bold mb-3 shadow-lg">
-            {getInitials(displayResident.name)}
+            {getInitials(displayResident.full_name)}
           </div>
-          <h1 className="text-2xl font-bold text-white">{displayResident.name}</h1>
+          <h1 className="text-2xl font-bold text-white">{displayResident.full_name}</h1>
           {displayResident.email && (
             <p className="text-green-100 text-sm mt-1">{displayResident.email}</p>
           )}
@@ -327,7 +327,7 @@ export default function ResidentPage() {
                 <p className="text-xs font-semibold text-gray-500 mb-3">Individual Lease Agreement</p>
                 <div className="space-y-2">
                   {[
-                    { title: "1. Parties", body: `This lease is between you (${displayResident.name}) and ${property?.name || "Property"} through Mews Network.` },
+                    { title: "1. Parties", body: `This lease is between you (${displayResident.full_name}) and ${property?.name || "Property"} through Mews Network.` },
                     { title: "2. Term", body: `Your stay runs from ${formatDate(selectedLease.start_date)} to ${formatDate(selectedLease.end_date)}.` },
                     { title: "3. Rent", body: `Monthly rent of ${formatCents(selectedLease.monthly_rent_cents)} is managed by your employer and processed automatically.` },
                     { title: "4. Furnished Unit", body: "Your unit is fully furnished with high-speed internet and standard utilities included." },
