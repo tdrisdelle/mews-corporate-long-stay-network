@@ -132,6 +132,7 @@ export default function BookerPage() {
   const [editingLeaseId, setEditingLeaseId] = useState<string | null>(null);
   const [deletingLeaseId, setDeletingLeaseId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [signingOverlay, setSigningOverlay] = useState(false);
 
   // Extension modal
   const [extendLease, setExtendLease] = useState<Lease | null>(null);
@@ -302,12 +303,17 @@ export default function BookerPage() {
 
   async function handleLeaseAction(leaseId: string, action: string, body?: unknown) {
     setActionLoading((prev) => ({ ...prev, [leaseId]: action }));
+    if (action === "sign") setSigningOverlay(true);
     try {
       await apiPost(`/api/leases/${leaseId}/${action}`, body);
+      if (action === "sign") {
+        await new Promise((res) => setTimeout(res, 2800));
+      }
       await fetchLeases();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Action failed");
     } finally {
+      setSigningOverlay(false);
       setActionLoading((prev) => {
         const next = { ...prev };
         delete next[leaseId];
@@ -850,6 +856,25 @@ export default function BookerPage() {
                 </button>
               </div>
             </>)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Signing overlay */}
+      {signingOverlay && (
+        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-10 flex flex-col items-center gap-5 max-w-xs w-full mx-4">
+            <div className="relative w-16 h-16">
+              <svg className="animate-spin w-16 h-16" viewBox="0 0 64 64" fill="none">
+                <circle cx="32" cy="32" r="28" stroke="#E5E7EB" strokeWidth="6" />
+                <path d="M32 4a28 28 0 0 1 28 28" stroke="#1D9E75" strokeWidth="6" strokeLinecap="round" />
+              </svg>
+              <FileText size={22} className="absolute inset-0 m-auto text-gray-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-base font-bold text-gray-900">Sending for Signature</p>
+              <p className="text-sm text-gray-500 mt-1">Preparing contracts and notifying signatories…</p>
             </div>
           </div>
         </div>
