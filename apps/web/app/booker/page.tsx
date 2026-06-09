@@ -123,6 +123,7 @@ export default function BookerPage() {
   const [createRent, setCreateRent] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [leaseCreated, setLeaseCreated] = useState(false);
   const [leasesLoading, setLeasesLoading] = useState(true);
 
   // Extension modal
@@ -218,6 +219,8 @@ export default function BookerPage() {
       });
       setShowCreatePanel(false);
       await fetchLeases();
+      setLeaseCreated(true);
+      setTimeout(() => setLeaseCreated(false), 4000);
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : "Failed to create lease");
     } finally {
@@ -443,6 +446,12 @@ export default function BookerPage() {
 
         {/* Lease List */}
         <section>
+          {leaseCreated && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-green-800 text-sm font-medium">
+              <CheckCircle size={16} className="text-green-600 shrink-0" />
+              Lease created — it's now in draft state below.
+            </div>
+          )}
           <h2 className="text-xl font-bold text-gray-900 mb-4">Your Bookings</h2>
 
           {leasesLoading ? (
