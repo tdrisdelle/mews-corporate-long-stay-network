@@ -211,11 +211,10 @@ export default function BookerPage() {
       await apiPost("/api/leases", {
         buyer_id: buyerId,
         property_id: selectedProperty.id,
-        start_date: createStart,
-        end_date: createEnd,
+        start: createStart,
+        end: createEnd,
         monthly_rent_cents: Math.round(parseFloat(createRent) * 100),
-        unit_count: unitCount,
-        resident_ids: [DEMO_IDS.resident],
+        residents: [{ id: DEMO_IDS.resident }],
       });
       setShowCreatePanel(false);
       await fetchLeases();
