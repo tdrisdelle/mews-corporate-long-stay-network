@@ -49,7 +49,7 @@ interface Lease {
 
 interface Buyer {
   id: string;
-  name: string;
+  legal_name: string;
   domain?: string;
   nma_signed_at?: string;
 }
@@ -167,7 +167,7 @@ export default function BookerPage() {
     // Fetch buyer info
     apiGet(`/api/buyers/${buyerId}`)
       .then((data) => setBuyer(data))
-      .catch(() => setBuyer({ id: buyerId, name: "Stanford Healthcare" }));
+      .catch(() => setBuyer({ id: buyerId, legal_name: "Stanford Healthcare" }));
 
     fetchLeases();
     // Run initial search
@@ -267,7 +267,7 @@ export default function BookerPage() {
             <div>
               <p className="text-green-100 text-sm font-medium mb-1">Corporate Housing Portal</p>
               <h1 className="text-3xl font-bold text-white mb-1">
-                Welcome back, {buyer?.name || "Loading..."}
+                Welcome back, {buyer?.legal_name || "Loading..."}
               </h1>
               <p className="text-green-100 text-sm">
                 Find and book verified corporate housing for your team

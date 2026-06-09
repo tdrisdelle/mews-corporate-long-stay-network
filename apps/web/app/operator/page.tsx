@@ -103,7 +103,7 @@ export default function OperatorPage() {
         uniqueBuyerIds.map(async (bid) => {
           try {
             const b: Buyer = await apiGet(`/api/buyers/${bid}`);
-            nameMap[bid] = b.name;
+            nameMap[bid] = b.legal_name;
           } catch {
             nameMap[bid] = bid.slice(0, 8) + "...";
           }
