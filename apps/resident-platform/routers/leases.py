@@ -144,6 +144,67 @@ async def _get_mews_reservation_ids(lease: Lease, db: AsyncSession) -> list[str]
     return event.event_metadata.get("reservation_ids", [])
 
 
+# ─── Overlap validator ────────────────────────────────────────────────────────
+
+async def _check_resident_overlap(
+    db: AsyncSession,
+    resident_id: uuid.UUID,
+    start_date: date,
+    end_date: date,
+    exclude_lease_id: Optional[uuid.UUID] = None,
+) -> Optional[dict]:
+    """Return conflicting lease info if resident has an overlapping non-terminal lease."""
+    stmt = (
+        select(Lease, NetworkProperty)
+        .join(LeaseResident, Lease.id == LeaseResident.lease_id)
+        .join(NetworkProperty, Lease.property_id == NetworkProperty.id)
+        .where(
+            LeaseResident.resident_id == resident_id,
+            Lease.state.notin_(["cancelled", "completed"]),
+            Lease.start_date < end_date,
+            Lease.end_date > start_date,
+        )
+    )
+    if exclude_lease_id:
+        stmt = stmt.where(Lease.id != exclude_lease_id)
+    row = (await db.execute(stmt)).first()
+    if not row:
+        return None
+    lease, prop = row
+    return {
+        "lease_id": str(lease.id),
+        "property_name": prop.legal_name,
+        "start_date": str(lease.start_date),
+        "end_date": str(lease.end_date),
+    }
+
+
+async def _validate_no_overlap(
+    db: AsyncSession,
+    residents: list,
+    start_date: date,
+    end_date: date,
+    exclude_lease_id: Optional[uuid.UUID] = None,
+) -> None:
+    for ra in residents:
+        try:
+            rid = uuid.UUID(ra.id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid resident ID: {ra.id}")
+        conflict = await _check_resident_overlap(db, rid, start_date, end_date, exclude_lease_id)
+        if conflict:
+            res = (await db.execute(select(Resident).where(Resident.id == rid))).scalar_one_or_none()
+            name = res.full_name if res else ra.id
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"{name} already has an overlapping booking at "
+                    f"{conflict['property_name']} "
+                    f"({conflict['start_date']} to {conflict['end_date']})"
+                ),
+            )
+
+
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/leases")
@@ -177,6 +238,9 @@ async def create_lease(body: CreateLeaseBody, db: AsyncSession = Depends(get_db)
         end_date = date.fromisoformat(body.end)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format")
+
+    # Overlap check: reject if any resident already has a conflicting booking
+    await _validate_no_overlap(db, body.residents, start_date, end_date)
 
     # Create lease
     lease = Lease(
@@ -595,6 +659,9 @@ async def update_lease(lease_id: str, body: UpdateLeaseBody, db: AsyncSession = 
         lease.monthly_rent_cents = body.monthly_rent_cents
 
     if body.residents is not None:
+        check_start = date.fromisoformat(body.start) if body.start else lease.start_date
+        check_end = date.fromisoformat(body.end) if body.end else lease.end_date
+        await _validate_no_overlap(db, body.residents, check_start, check_end, exclude_lease_id=lease.id)
         await db.execute(delete(LeaseResident).where(LeaseResident.lease_id == lease.id))
         for ra in body.residents:
             try:
