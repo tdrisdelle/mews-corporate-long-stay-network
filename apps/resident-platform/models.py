@@ -81,7 +81,7 @@ class LeaseEvent(Base):
     event_type = Column(String, nullable=False)
     actor_type = Column(String, nullable=False)
     actor_id = Column(UUID(as_uuid=True))
-    metadata = Column(JSONB, default=dict)
+    event_metadata = Column("metadata", JSONB, default=dict)
     occurred_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
