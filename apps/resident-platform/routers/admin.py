@@ -43,7 +43,7 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
         await db.execute(
             text("""
                 INSERT INTO buyers (id, legal_name, buyer_type, nma_status, take_rate_pct, mews_company_links)
-                VALUES (:id::uuid, :legal_name, :buyer_type, :nma_status, :take_rate_pct, '{}')
+                VALUES (CAST(:id AS uuid), :legal_name, :buyer_type, :nma_status, :take_rate_pct, '{}')
                 ON CONFLICT (id) DO NOTHING
             """),
             b,
@@ -63,7 +63,7 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
         await db.execute(
             text("""
                 INSERT INTO residents (id, full_name, email, mews_customer_links)
-                VALUES (:id::uuid, :full_name, :email, '{}')
+                VALUES (CAST(:id AS uuid), :full_name, :email, '{}')
                 ON CONFLICT (id) DO NOTHING
             """),
             r,
@@ -141,7 +141,7 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
                     accepts_network_bookings, unit_count, npa_status, rate_floor_cents, photo_url
                 )
                 VALUES (
-                    :id::uuid, :mews_enterprise_id::uuid, :legal_name, :metro, :jurisdiction,
+                    CAST(:id AS uuid), CAST(:mews_enterprise_id AS uuid), :legal_name, :metro, :jurisdiction,
                     :accepts_network_bookings, :unit_count, :npa_status, :rate_floor_cents, :photo_url
                 )
                 ON CONFLICT (id) DO NOTHING
