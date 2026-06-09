@@ -1,0 +1,39 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: mews
+      POSTGRES_PASSWORD: mews
+      POSTGRES_DB: resident_platform
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mews"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mock-mews-api:
+    build: ./apps/mock-mews-api
+    ports: ["8001:8001"]
+    environment:
+      WEBHOOK_TARGET_URL: http://resident-platform:8000/webhooks/mews
+
+  resident-platform:
+    build: ./apps/resident-platform
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://mews:mews@postgres:5432/resident_platform
+      MEWS_CONNECTOR_BASE_URL: http://mock-mews-api:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-mews-api:
+        condition: service_started
+
+  web:
+    build: ./apps/web
+    ports: ["3000:3000"]
+    environment:
+      NEXT_PUBLIC_PLATFORM_URL: http://localhost:8000
+    depends_on: [resident-platform]
