@@ -50,21 +50,22 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
         )
 
     # ── Residents ──────────────────────────────────────────────────────────────
+    stanford_buyer_id = "a0000000-0000-0000-0000-000000000001"
     residents = [
-        {"id": "b0000000-0000-0000-0000-000000000001", "full_name": "Maria Santos", "email": "maria.santos@demo.com"},
-        {"id": "b0000000-0000-0000-0000-000000000002", "full_name": "James Park", "email": "james.park@demo.com"},
-        {"id": "b0000000-0000-0000-0000-000000000003", "full_name": "Aisha Mohammed", "email": "aisha.mohammed@demo.com"},
-        {"id": "b0000000-0000-0000-0000-000000000004", "full_name": "Carlos Reyes", "email": "carlos.reyes@demo.com"},
-        {"id": "b0000000-0000-0000-0000-000000000005", "full_name": "Jennifer Liu", "email": "jennifer.liu@demo.com"},
-        {"id": "b0000000-0000-0000-0000-000000000006", "full_name": "Devon Williams", "email": "devon.williams@demo.com"},
+        {"id": "b0000000-0000-0000-0000-000000000001", "full_name": "Maria Santos", "email": "maria.santos@demo.com", "buyer_id": stanford_buyer_id},
+        {"id": "b0000000-0000-0000-0000-000000000002", "full_name": "James Park", "email": "james.park@demo.com", "buyer_id": stanford_buyer_id},
+        {"id": "b0000000-0000-0000-0000-000000000003", "full_name": "Aisha Mohammed", "email": "aisha.mohammed@demo.com", "buyer_id": stanford_buyer_id},
+        {"id": "b0000000-0000-0000-0000-000000000004", "full_name": "Carlos Reyes", "email": "carlos.reyes@demo.com", "buyer_id": stanford_buyer_id},
+        {"id": "b0000000-0000-0000-0000-000000000005", "full_name": "Jennifer Liu", "email": "jennifer.liu@demo.com", "buyer_id": stanford_buyer_id},
+        {"id": "b0000000-0000-0000-0000-000000000006", "full_name": "Devon Williams", "email": "devon.williams@demo.com", "buyer_id": stanford_buyer_id},
     ]
 
     for r in residents:
         await db.execute(
             text("""
-                INSERT INTO residents (id, full_name, email, mews_customer_links)
-                VALUES (CAST(:id AS uuid), :full_name, :email, '{}')
-                ON CONFLICT (id) DO NOTHING
+                INSERT INTO residents (id, buyer_id, full_name, email, mews_customer_links)
+                VALUES (CAST(:id AS uuid), CAST(:buyer_id AS uuid), :full_name, :email, '{}')
+                ON CONFLICT (id) DO UPDATE SET buyer_id = CAST(:buyer_id AS uuid)
             """),
             r,
         )

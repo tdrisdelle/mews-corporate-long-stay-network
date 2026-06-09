@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from database import engine, Base
 import models
 
@@ -12,6 +13,9 @@ from routers import properties, buyers, leases, residents, webhooks, admin
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text(
+            "ALTER TABLE residents ADD COLUMN IF NOT EXISTS buyer_id UUID REFERENCES buyers(id)"
+        ))
     yield
 
 

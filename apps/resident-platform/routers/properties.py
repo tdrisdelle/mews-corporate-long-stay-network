@@ -1,10 +1,10 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from typing import Optional
 from database import get_db
-from models import NetworkProperty
+from models import NetworkProperty, Lease
 
 router = APIRouter(tags=["properties"])
 
@@ -35,12 +35,30 @@ async def search_properties(
     unit_count: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(NetworkProperty).where(NetworkProperty.accepts_network_bookings == True)
+    occupied_sq = (
+        select(Lease.property_id, func.coalesce(func.sum(Lease.unit_count), 0).label("occupied"))
+        .where(Lease.state.notin_(["cancelled", "completed"]))
+        .group_by(Lease.property_id)
+        .subquery()
+    )
+    stmt = (
+        select(NetworkProperty, func.coalesce(occupied_sq.c.occupied, 0).label("occupied"))
+        .outerjoin(occupied_sq, NetworkProperty.id == occupied_sq.c.property_id)
+        .where(NetworkProperty.accepts_network_bookings == True)
+    )
     if metro:
         stmt = stmt.where(NetworkProperty.metro.ilike(f"%{metro}%"))
     result = await db.execute(stmt)
-    properties = result.scalars().all()
-    return [_property_to_dict(p) for p in properties]
+    rows = result.all()
+    out = []
+    for prop, occupied in rows:
+        available = max(0, (prop.unit_count or 0) - int(occupied or 0))
+        if unit_count is not None and available < unit_count:
+            continue
+        d = _property_to_dict(prop)
+        d["available_units"] = available
+        out.append(d)
+    return out
 
 
 @router.get("/properties/{property_id}")

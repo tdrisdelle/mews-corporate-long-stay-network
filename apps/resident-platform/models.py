@@ -8,6 +8,7 @@ from database import Base
 class Resident(Base):
     __tablename__ = "residents"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    buyer_id = Column(UUID(as_uuid=True), ForeignKey("buyers.id"), nullable=True)
     full_name = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     phone = Column(String)

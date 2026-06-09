@@ -23,14 +23,21 @@ import {
 
 interface Property {
   id: string;
-  name: string;
+  legal_name: string;
   metro: string;
   jurisdiction: string;
   rate_floor_cents: number;
-  total_units: number;
+  unit_count: number;
+  available_units: number;
   accepts_network_bookings: boolean;
   photo_url?: string;
-  amenities?: string[];
+}
+
+interface Traveler {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
 }
 
 interface Lease {
@@ -62,15 +69,6 @@ const LEASE_STATE_COLORS: Record<string, { bg: string; text: string; label: stri
   completed: { bg: "#F3F4F6", text: "#6B7280", label: "Completed" },
   cancelled: { bg: "#FEE2E2", text: "#991B1B", label: "Cancelled" },
 };
-
-const DEMO_RESIDENTS = [
-  { name: "Maria Santos", unit: "Unit 4A" },
-  { name: "James Park", unit: "Unit 4B" },
-  { name: "Aisha Mohammed", unit: "Unit 5A" },
-  { name: "Carlos Reyes", unit: "Unit 5B" },
-  { name: "Jennifer Liu", unit: "Unit 6A" },
-  { name: "Devon Williams", unit: "Unit 6B" },
-];
 
 const METROS = ["Nashville", "Dallas", "Raleigh", "Phoenix", "Boston"];
 
@@ -125,6 +123,10 @@ export default function BookerPage() {
   const [createError, setCreateError] = useState("");
   const [leaseCreated, setLeaseCreated] = useState(false);
   const [leasesLoading, setLeasesLoading] = useState(true);
+  const [createStep, setCreateStep] = useState<1 | 2>(1);
+  const [travelers, setTravelers] = useState<Traveler[]>([]);
+  const [travelersLoading, setTravelersLoading] = useState(false);
+  const [assignments, setAssignments] = useState<Record<number, string>>({});
 
   // Extension modal
   const [extendLease, setExtendLease] = useState<Lease | null>(null);
@@ -201,7 +203,30 @@ export default function BookerPage() {
     setCreateEnd(endDate);
     setCreateRent(String(property.rate_floor_cents / 100));
     setCreateError("");
+    setCreateStep(1);
+    setAssignments({});
     setShowCreatePanel(true);
+  }
+
+  function closeCreatePanel() {
+    setShowCreatePanel(false);
+    setCreateStep(1);
+    setAssignments({});
+  }
+
+  async function handleNextStep() {
+    if (travelers.length === 0) {
+      setTravelersLoading(true);
+      try {
+        const data = await apiGet(`/api/buyers/${buyerId}/travelers`);
+        setTravelers(Array.isArray(data) ? data : []);
+      } catch {
+        setTravelers([]);
+      } finally {
+        setTravelersLoading(false);
+      }
+    }
+    setCreateStep(2);
   }
 
   async function handleCreateLease() {
@@ -209,15 +234,19 @@ export default function BookerPage() {
     setCreating(true);
     setCreateError("");
     try {
+      const residents = Array.from({ length: unitCount }, (_, i) => ({
+        id: assignments[i],
+        unit_assignment: `Unit ${i + 1}`,
+      }));
       await apiPost("/api/leases", {
         buyer_id: buyerId,
         property_id: selectedProperty.id,
         start: createStart,
         end: createEnd,
         monthly_rent_cents: Math.round(parseFloat(createRent) * 100),
-        residents: [{ id: DEMO_IDS.resident }],
+        residents,
       });
-      setShowCreatePanel(false);
+      closeCreatePanel();
       await fetchLeases();
       setLeaseCreated(true);
       setTimeout(() => setLeaseCreated(false), 4000);
@@ -409,7 +438,7 @@ export default function BookerPage() {
                 </div>
 
                 <div className="p-4">
-                  <h3 className="font-bold text-gray-900 text-base mb-1">{property.name}</h3>
+                  <h3 className="font-bold text-gray-900 text-base mb-1">{property.legal_name}</h3>
                   <div className="flex items-center gap-1 text-gray-500 text-sm mb-3">
                     <MapPin size={13} />
                     <span>{property.metro}</span>
@@ -427,7 +456,7 @@ export default function BookerPage() {
                       <p className="text-xs text-gray-400 font-medium">Available</p>
                       <div className="flex items-center gap-1 text-gray-700 font-semibold text-sm">
                         <Users size={13} />
-                        <span>{property.total_units} units</span>
+                        <span>{property.available_units ?? property.unit_count} units</span>
                       </div>
                     </div>
                   </div>
@@ -562,25 +591,30 @@ export default function BookerPage() {
       {/* Create Lease Panel */}
       {showCreatePanel && selectedProperty && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreatePanel(false)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeCreatePanel} />
           <div className="relative bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
             {/* Panel header */}
             <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between rounded-t-3xl sm:rounded-t-2xl">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Create Lease</h2>
-                <p className="text-sm text-gray-500">{selectedProperty.name} · {selectedProperty.metro}</p>
+                <h2 className="text-xl font-bold text-gray-900">
+                  {createStep === 1 ? "Create Lease" : "Assign Travelers"}
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Step {createStep} of 2 · {selectedProperty.legal_name} · {selectedProperty.metro}
+                </p>
               </div>
-              <button onClick={() => setShowCreatePanel(false)} className="text-gray-400 hover:text-gray-600 p-1">
+              <button onClick={closeCreatePanel} className="text-gray-400 hover:text-gray-600 p-1">
                 <X size={22} />
               </button>
             </div>
 
             <div className="px-6 py-5 space-y-5">
+            {createStep === 1 ? (<>
               {/* Property summary */}
               <div className="rounded-xl border border-gray-100 overflow-hidden">
                 <div className="h-32 bg-gradient-to-br from-gray-100 to-gray-200 relative">
                   {selectedProperty.photo_url ? (
-                    <img src={selectedProperty.photo_url} alt={selectedProperty.name} className="w-full h-full object-cover" />
+                    <img src={selectedProperty.photo_url} alt={selectedProperty.legal_name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <Building2 size={40} className="text-gray-300" />
@@ -589,7 +623,7 @@ export default function BookerPage() {
                 </div>
                 <div className="p-4 flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-gray-900">{selectedProperty.name}</p>
+                    <p className="font-semibold text-gray-900">{selectedProperty.legal_name}</p>
                     <p className="text-sm text-gray-500 flex items-center gap-1"><MapPin size={12} />{selectedProperty.metro} · {selectedProperty.jurisdiction}</p>
                   </div>
                   <div className="text-right">
@@ -641,36 +675,6 @@ export default function BookerPage() {
                 </div>
               </div>
 
-              {/* Residents */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-2">
-                  Residents ({DEMO_RESIDENTS.length} travel nurses)
-                </label>
-                <div className="space-y-2">
-                  {DEMO_RESIDENTS.map((r, i) => (
-                    <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-gray-50 text-sm">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: "#1D9E75" }}
-                        >
-                          {r.name.charAt(0)}
-                        </div>
-                        <span className="font-medium text-gray-800">{r.name}</span>
-                      </div>
-                      <span className="text-xs text-gray-400 font-medium">{r.unit}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {createError && (
-                <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-lg px-3 py-2.5 text-sm">
-                  <AlertCircle size={15} />
-                  {createError}
-                </div>
-              )}
-
               {/* Total summary */}
               <div className="bg-gray-50 rounded-xl p-4">
                 <div className="flex justify-between text-sm mb-1">
@@ -686,14 +690,87 @@ export default function BookerPage() {
               </div>
 
               <button
-                onClick={handleCreateLease}
-                disabled={creating || !createRent || !createStart || !createEnd}
+                onClick={handleNextStep}
+                disabled={!createRent || !createStart || !createEnd}
                 className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: "#1D9E75" }}
               >
-                {creating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                {creating ? "Creating..." : "Create Lease"}
+                Next: Assign Travelers <ArrowRight size={16} />
               </button>
+            </>) : (<>
+              {/* Step 2: Assign travelers to units */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-3">
+                  Assign a traveler to each of the {unitCount} units in this lease.
+                </p>
+                {travelersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={22} className="animate-spin text-gray-400" />
+                  </div>
+                ) : travelers.length === 0 ? (
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                    No travelers found on your roster. Re-seed the platform to load demo travelers.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {Array.from({ length: unitCount }, (_, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-gray-500 w-14 shrink-0">Unit {i + 1}</span>
+                        <select
+                          value={assignments[i] || ""}
+                          onChange={(e) => setAssignments((prev) => ({ ...prev, [i]: e.target.value }))}
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 bg-white"
+                        >
+                          <option value="">— Select traveler —</option>
+                          {travelers.map((t) => (
+                            <option
+                              key={t.id}
+                              value={t.id}
+                              disabled={
+                                Object.entries(assignments).some(
+                                  ([slot, id]) => id === t.id && Number(slot) !== i
+                                )
+                              }
+                            >
+                              {t.full_name}{t.email ? ` · ${t.email}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {createError && (
+                <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-lg px-3 py-2.5 text-sm">
+                  <AlertCircle size={15} />
+                  {createError}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setCreateStep(1)}
+                  className="py-3 px-5 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={handleCreateLease}
+                  disabled={
+                    creating ||
+                    Object.keys(assignments).length < unitCount ||
+                    Object.values(assignments).some((v) => !v)
+                  }
+                  className="flex-1 py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: "#1D9E75" }}
+                >
+                  {creating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                  {creating ? "Creating..." : "Create Lease"}
+                </button>
+              </div>
+            </>)}
             </div>
           </div>
         </div>

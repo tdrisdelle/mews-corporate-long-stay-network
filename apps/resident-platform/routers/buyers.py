@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
-from models import Buyer
+from models import Buyer, Resident
 
 router = APIRouter(tags=["buyers"])
 
@@ -34,6 +34,20 @@ async def get_buyer(buyer_id: str, db: AsyncSession = Depends(get_db)):
     if not buyer:
         raise HTTPException(status_code=404, detail="Buyer not found")
     return _buyer_to_dict(buyer)
+
+
+@router.get("/buyers/{buyer_id}/travelers")
+async def list_travelers(buyer_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        bid = uuid.UUID(buyer_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid buyer ID")
+    result = await db.execute(select(Resident).where(Resident.buyer_id == bid).order_by(Resident.full_name))
+    travelers = result.scalars().all()
+    return [
+        {"id": str(t.id), "full_name": t.full_name, "email": t.email, "phone": t.phone}
+        for t in travelers
+    ]
 
 
 @router.post("/buyers/{buyer_id}/nma")
