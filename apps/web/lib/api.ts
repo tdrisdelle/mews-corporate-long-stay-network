@@ -19,6 +19,15 @@ export async function apiPost(path: string, body?: unknown) {
   return res.json();
 }
 
+export async function apiDelete(path: string) {
+  const res = await fetch(`${BASE_URL}${path}`, { method: "DELETE" });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`API error ${res.status}: ${err}`);
+  }
+  return res.json();
+}
+
 export async function apiPatch(path: string, body?: unknown) {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "PATCH",

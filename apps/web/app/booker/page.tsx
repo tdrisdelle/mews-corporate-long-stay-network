@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { DEMO_IDS } from "@/lib/auth";
 import { format } from "date-fns";
 import {
@@ -19,6 +19,8 @@ import {
   Loader2,
   AlertCircle,
   Star,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface Property {
@@ -49,7 +51,7 @@ interface Lease {
   end_date: string;
   monthly_rent_cents: number;
   unit_count?: number;
-  resident_ids?: string[];
+  residents?: { id: string; unit_assignment: string }[];
   property?: Property;
   buyer_name?: string;
 }
@@ -127,6 +129,9 @@ export default function BookerPage() {
   const [travelers, setTravelers] = useState<Traveler[]>([]);
   const [travelersLoading, setTravelersLoading] = useState(false);
   const [assignments, setAssignments] = useState<Record<number, string>>({});
+  const [editingLeaseId, setEditingLeaseId] = useState<string | null>(null);
+  const [deletingLeaseId, setDeletingLeaseId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Extension modal
   const [extendLease, setExtendLease] = useState<Lease | null>(null);
@@ -212,6 +217,33 @@ export default function BookerPage() {
     setShowCreatePanel(false);
     setCreateStep(1);
     setAssignments({});
+    setEditingLeaseId(null);
+  }
+
+  function openEditPanel(lease: Lease) {
+    setEditingLeaseId(lease.id);
+    setCreateStart(lease.start_date);
+    setCreateEnd(lease.end_date);
+    setCreateRent(String(lease.monthly_rent_cents / 100));
+    setCreateError("");
+    setCreateStep(1);
+    const preAssigned: Record<number, string> = {};
+    (lease.residents ?? []).forEach((r, i) => { preAssigned[i] = r.id; });
+    setAssignments(preAssigned);
+    setShowCreatePanel(true);
+  }
+
+  async function handleDeleteLease(leaseId: string) {
+    setDeleteLoading(true);
+    try {
+      await apiDelete(`/api/leases/${leaseId}`);
+      setDeletingLeaseId(null);
+      await fetchLeases();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   async function handleNextStep() {
@@ -230,7 +262,7 @@ export default function BookerPage() {
   }
 
   async function handleCreateLease() {
-    if (!selectedProperty) return;
+    if (!selectedProperty && !editingLeaseId) return;
     setCreating(true);
     setCreateError("");
     try {
@@ -238,20 +270,31 @@ export default function BookerPage() {
         id: assignments[i],
         unit_assignment: `Unit ${i + 1}`,
       }));
-      await apiPost("/api/leases", {
-        buyer_id: buyerId,
-        property_id: selectedProperty.id,
-        start: createStart,
-        end: createEnd,
-        monthly_rent_cents: Math.round(parseFloat(createRent) * 100),
-        residents,
-      });
+      if (editingLeaseId) {
+        await apiPatch(`/api/leases/${editingLeaseId}`, {
+          start: createStart,
+          end: createEnd,
+          monthly_rent_cents: Math.round(parseFloat(createRent) * 100),
+          residents,
+        });
+      } else {
+        await apiPost("/api/leases", {
+          buyer_id: buyerId,
+          property_id: selectedProperty!.id,
+          start: createStart,
+          end: createEnd,
+          monthly_rent_cents: Math.round(parseFloat(createRent) * 100),
+          residents,
+        });
+      }
       closeCreatePanel();
       await fetchLeases();
-      setLeaseCreated(true);
-      setTimeout(() => setLeaseCreated(false), 4000);
+      if (!editingLeaseId) {
+        setLeaseCreated(true);
+        setTimeout(() => setLeaseCreated(false), 4000);
+      }
     } catch (e) {
-      setCreateError(e instanceof Error ? e.message : "Failed to create lease");
+      setCreateError(e instanceof Error ? e.message : editingLeaseId ? "Failed to save changes" : "Failed to create lease");
     } finally {
       setCreating(false);
     }
@@ -533,12 +576,45 @@ export default function BookerPage() {
                       {/* Actions */}
                       <div className="flex flex-wrap gap-2">
                         {lease.state === "draft" && (
-                          <ActionButton
-                            label="Send for Signature"
-                            loading={loading === "sign"}
-                            onClick={() => handleLeaseAction(lease.id, "sign")}
-                            color="#185FA5"
-                          />
+                          <>
+                            <button
+                              onClick={() => openEditPanel(lease)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1"
+                            >
+                              <Pencil size={11} /> Edit
+                            </button>
+                            {deletingLeaseId === lease.id ? (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-red-600 font-medium">Delete?</span>
+                                <button
+                                  onClick={() => handleDeleteLease(lease.id)}
+                                  disabled={deleteLoading}
+                                  className="px-2 py-1 rounded text-xs font-bold text-white bg-red-500 hover:bg-red-600 disabled:opacity-50"
+                                >
+                                  {deleteLoading ? <Loader2 size={10} className="animate-spin" /> : "Yes"}
+                                </button>
+                                <button
+                                  onClick={() => setDeletingLeaseId(null)}
+                                  className="px-2 py-1 rounded text-xs font-semibold text-gray-500 hover:bg-gray-100"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setDeletingLeaseId(lease.id)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-100 text-red-500 hover:bg-red-50 transition-colors flex items-center gap-1"
+                              >
+                                <Trash2 size={11} /> Delete
+                              </button>
+                            )}
+                            <ActionButton
+                              label="Send for Signature"
+                              loading={loading === "sign"}
+                              onClick={() => handleLeaseAction(lease.id, "sign")}
+                              color="#185FA5"
+                            />
+                          </>
                         )}
                         {lease.state === "signed" && (
                           <ActionButton
@@ -597,10 +673,13 @@ export default function BookerPage() {
             <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between rounded-t-3xl sm:rounded-t-2xl">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
-                  {createStep === 1 ? "Create Lease" : "Assign Travelers"}
+                  {editingLeaseId
+                    ? createStep === 1 ? "Edit Lease" : "Reassign Travelers"
+                    : createStep === 1 ? "Create Lease" : "Assign Travelers"}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Step {createStep} of 2 · {selectedProperty.legal_name} · {selectedProperty.metro}
+                  Step {createStep} of 2
+                  {selectedProperty && ` · ${selectedProperty.legal_name} · ${selectedProperty.metro}`}
                 </p>
               </div>
               <button onClick={closeCreatePanel} className="text-gray-400 hover:text-gray-600 p-1">
@@ -767,7 +846,7 @@ export default function BookerPage() {
                   style={{ backgroundColor: "#1D9E75" }}
                 >
                   {creating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                  {creating ? "Creating..." : "Create Lease"}
+                  {creating ? "Saving..." : editingLeaseId ? "Save Changes" : "Create Lease"}
                 </button>
               </div>
             </>)}

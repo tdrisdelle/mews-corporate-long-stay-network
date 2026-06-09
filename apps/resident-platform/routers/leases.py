@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from pydantic import BaseModel
 from database import get_db
 from models import Lease, LeaseResident, LeaseEvent, Contract, Buyer, NetworkProperty, Resident
@@ -41,9 +41,16 @@ class ExtendLeaseBody(BaseModel):
     new_end: str  # ISO date
 
 
+class UpdateLeaseBody(BaseModel):
+    start: Optional[str] = None
+    end: Optional[str] = None
+    monthly_rent_cents: Optional[int] = None
+    residents: Optional[list[ResidentAssignment]] = None
+
+
 # ─── Serializers ──────────────────────────────────────────────────────────────
 
-def _lease_to_dict(l: Lease, events: list = None, contracts: list = None) -> dict:
+def _lease_to_dict(l: Lease, events: list = None, contracts: list = None, residents: list = None) -> dict:
     d = {
         "id": str(l.id),
         "buyer_id": str(l.buyer_id) if l.buyer_id else None,
@@ -65,6 +72,8 @@ def _lease_to_dict(l: Lease, events: list = None, contracts: list = None) -> dic
         d["events"] = [_event_to_dict(e) for e in events]
     if contracts is not None:
         d["contracts"] = [_contract_to_dict(c) for c in contracts]
+    if residents is not None:
+        d["residents"] = [{"id": str(lr.resident_id), "unit_assignment": lr.unit_assignment} for lr in residents]
     return d
 
 
@@ -542,4 +551,67 @@ async def list_leases(
 
     result = await db.execute(stmt)
     leases = result.scalars().all()
-    return [_lease_to_dict(l) for l in leases]
+    if leases:
+        lease_ids = [l.id for l in leases]
+        lr_result = await db.execute(select(LeaseResident).where(LeaseResident.lease_id.in_(lease_ids)))
+        lr_map: dict = {}
+        for lr in lr_result.scalars().all():
+            lr_map.setdefault(lr.lease_id, []).append(lr)
+    else:
+        lr_map = {}
+    return [_lease_to_dict(l, residents=lr_map.get(l.id, [])) for l in leases]
+
+
+@router.delete("/leases/{lease_id}")
+async def delete_lease(lease_id: str, db: AsyncSession = Depends(get_db)):
+    lease = await _get_lease_or_404(lease_id, db)
+    if lease.state != "draft":
+        raise HTTPException(status_code=400, detail="Only draft leases can be deleted")
+    await db.execute(delete(LeaseResident).where(LeaseResident.lease_id == lease.id))
+    await db.execute(delete(Contract).where(Contract.lease_id == lease.id))
+    await db.execute(delete(LeaseEvent).where(LeaseEvent.lease_id == lease.id))
+    await db.delete(lease)
+    await db.commit()
+    return {"deleted": lease_id}
+
+
+@router.patch("/leases/{lease_id}")
+async def update_lease(lease_id: str, body: UpdateLeaseBody, db: AsyncSession = Depends(get_db)):
+    lease = await _get_lease_or_404(lease_id, db)
+    if lease.state != "draft":
+        raise HTTPException(status_code=400, detail="Only draft leases can be edited")
+
+    if body.start:
+        try:
+            lease.start_date = date.fromisoformat(body.start)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start date")
+    if body.end:
+        try:
+            lease.end_date = date.fromisoformat(body.end)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end date")
+    if body.monthly_rent_cents is not None:
+        lease.monthly_rent_cents = body.monthly_rent_cents
+
+    if body.residents is not None:
+        await db.execute(delete(LeaseResident).where(LeaseResident.lease_id == lease.id))
+        for ra in body.residents:
+            try:
+                rid = uuid.UUID(ra.id)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid resident ID: {ra.id}")
+            db.add(LeaseResident(lease_id=lease.id, resident_id=rid, unit_assignment=ra.unit_assignment))
+        lease.unit_count = len(body.residents)
+        # Update contract parties to reflect new resident assignments
+        contract_result = await db.execute(select(Contract).where(Contract.lease_id == lease.id))
+        contract = contract_result.scalar_one_or_none()
+        if contract:
+            contract.parties = {
+                **contract.parties,
+                "residents": [{"id": ra.id, "unit_assignment": ra.unit_assignment} for ra in body.residents],
+            }
+
+    await db.commit()
+    await db.refresh(lease)
+    return await _get_lease_with_details(lease, db)
