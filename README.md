@@ -141,4 +141,8 @@ draft → signed → active → completed
 
 ---
 
-*[Link to project pitch summary PDF — Tim will add]*
+## Project Documents
+
+- [Pitch Deck](Mews_Long_Stay_Network_Pitch.pdf) — investor-facing overview of the opportunity, product, and go-to-market
+- [Presentation](Mews_Long_Stay_Network_Presentation.pdf) — stakeholder walkthrough of the platform and demo
+- [Project Journal](Mews_Long_Stay_Network_Journal.pdf) — build log covering architecture decisions, tradeoffs, and implementation notes
