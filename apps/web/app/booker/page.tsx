@@ -224,6 +224,14 @@ export default function BookerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep detail panel in sync after any lease action refreshes the list
+  useEffect(() => {
+    if (!viewingLease) return;
+    const updated = leases.find((l) => l.id === viewingLease.id);
+    if (updated) setViewingLease(updated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leases]);
+
   async function handleSearch() {
     setSearching(true);
     setSearchError("");
@@ -1336,6 +1344,87 @@ export default function BookerPage() {
                   </p>
                 )}
               </div>
+
+              {/* Actions */}
+              {["draft", "contract_sent", "signed", "active"].includes(viewingLease.state) && (() => {
+                const loading = actionLoading[viewingLease.id];
+                return (
+                  <div className="pt-1">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Actions</p>
+                    <div className="flex flex-wrap gap-2">
+                      {viewingLease.state === "draft" && (
+                        <>
+                          <button
+                            onClick={() => { setViewingLease(null); openEditPanel(viewingLease); }}
+                            className="px-3 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                          >
+                            <Pencil size={13} /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleLeaseAction(viewingLease.id, "sign")}
+                            disabled={!!loading}
+                            className="flex-1 px-3 py-2 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-60 hover:opacity-90 transition-opacity"
+                            style={{ backgroundColor: "#185FA5" }}
+                          >
+                            {loading === "sign" && <Loader2 size={13} className="animate-spin" />}
+                            Send for Signature
+                          </button>
+                        </>
+                      )}
+                      {viewingLease.state === "contract_sent" && (
+                        <button
+                          onClick={() => handleLeaseAction(viewingLease.id, "sign")}
+                          disabled={!!loading}
+                          className="flex-1 px-3 py-2 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-60 hover:opacity-90 transition-opacity"
+                          style={{ backgroundColor: "#6D28D9" }}
+                        >
+                          {loading === "sign" && <Loader2 size={13} className="animate-spin" />}
+                          Mark Signed
+                        </button>
+                      )}
+                      {viewingLease.state === "signed" && (
+                        <button
+                          onClick={() => handleLeaseAction(viewingLease.id, "activate")}
+                          disabled={!!loading}
+                          className="flex-1 px-3 py-2 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-60 hover:opacity-90 transition-opacity"
+                          style={{ backgroundColor: "#1D9E75" }}
+                        >
+                          {loading === "activate" && <Loader2 size={13} className="animate-spin" />}
+                          Activate
+                        </button>
+                      )}
+                      {viewingLease.state === "active" && (
+                        <>
+                          <button
+                            onClick={() => handleLeaseAction(viewingLease.id, "check-in")}
+                            disabled={!!loading}
+                            className="px-3 py-2 rounded-xl text-sm font-bold text-white flex items-center gap-1.5 disabled:opacity-60 hover:opacity-90 transition-opacity"
+                            style={{ backgroundColor: "#1D9E75" }}
+                          >
+                            {loading === "check-in" && <Loader2 size={13} className="animate-spin" />}
+                            Check In
+                          </button>
+                          <button
+                            onClick={() => { setExtendLease(viewingLease); setExtendDate(viewingLease.end_date); }}
+                            className="px-3 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+                          >
+                            Extend
+                          </button>
+                          <button
+                            onClick={() => handleLeaseAction(viewingLease.id, "check-out")}
+                            disabled={!!loading}
+                            className="px-3 py-2 rounded-xl text-sm font-bold text-white flex items-center gap-1.5 disabled:opacity-60 hover:opacity-90 transition-opacity"
+                            style={{ backgroundColor: "#BA7517" }}
+                          >
+                            {loading === "check-out" && <Loader2 size={13} className="animate-spin" />}
+                            Check Out
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Lease reference */}
               <div className="flex items-center justify-between pt-2 border-t border-gray-100">
