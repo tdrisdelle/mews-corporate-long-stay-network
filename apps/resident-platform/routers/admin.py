@@ -1,12 +1,13 @@
 import json
 import logging
+import uuid
+from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from database import get_db
 from models import Buyer, Resident, NetworkProperty, Lease, LeaseEvent, Contract
 from contracts.templates import get_template
-import uuid
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["admin"])
@@ -364,13 +365,14 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
                                 unit_count, monthly_rent_cents, jurisdiction, network_take_rate_pct)
             VALUES (
                 CAST(:id AS uuid), CAST(:buyer_id AS uuid), CAST(:property_id AS uuid),
-                :state, CAST(:start AS date), CAST(:end AS date),
-                :unit_count, :rent, :jurisdiction, :take_rate
+                :state, :start, :end, :unit_count, :rent, :jurisdiction, :take_rate
             )
             ON CONFLICT (id) DO NOTHING
         """), {
             "id": ld["id"], "buyer_id": bid, "property_id": pid,
-            "state": ld["state"], "start": ld["start"], "end": ld["end"],
+            "state": ld["state"],
+            "start": date.fromisoformat(ld["start"]),
+            "end": date.fromisoformat(ld["end"]),
             "unit_count": ld["unit_count"], "rent": ld["rent"],
             "jurisdiction": jur, "take_rate": buyer_meta[bid]["take_rate"],
         })
@@ -406,7 +408,7 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
                 CAST(:id AS uuid), CAST(:lease_id AS uuid),
                 :contract_type, :jurisdiction, :template_name,
                 CAST(:body AS jsonb), CAST(:parties AS jsonb),
-                CAST(:signed_at AS timestamptz)
+                :signed_at
             )
             ON CONFLICT (id) DO NOTHING
         """), {
@@ -417,7 +419,7 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
             "template_name": template["template_id"],
             "body": json.dumps(body),
             "parties": json.dumps(parties),
-            "signed_at": ld["signed_at"],
+            "signed_at": datetime.fromisoformat(ld["signed_at"]),
         })
 
         # LeaseEvents
@@ -426,8 +428,7 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
                 INSERT INTO lease_events (id, lease_id, event_type, actor_type, occurred_at)
                 VALUES (
                     CAST(:id AS uuid), CAST(:lease_id AS uuid),
-                    :event_type, :actor_type,
-                    CAST(:occurred_at AS timestamptz)
+                    :event_type, :actor_type, :occurred_at
                 )
                 ON CONFLICT (id) DO NOTHING
             """), {
@@ -435,7 +436,7 @@ async def seed_data(db: AsyncSession = Depends(get_db)):
                 "lease_id": ld["id"],
                 "event_type": event_type,
                 "actor_type": actor_type,
-                "occurred_at": occurred_at,
+                "occurred_at": datetime.fromisoformat(occurred_at),
             })
 
     await db.commit()
