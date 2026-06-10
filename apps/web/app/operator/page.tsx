@@ -30,11 +30,11 @@ interface Lease {
 
 interface Property {
   id: string;
-  name: string;
+  legal_name: string;
   metro: string;
   jurisdiction: string;
   rate_floor_cents: number;
-  total_units: number;
+  unit_count: number;
   accepts_network_bookings: boolean;
   max_network_exposure_pct?: number;
 }
@@ -167,14 +167,14 @@ export default function OperatorPage() {
       <div style={{ background: "linear-gradient(135deg, #185FA5 0%, #1D9E75 100%)" }} className="px-6 py-10">
         <div className="max-w-5xl mx-auto">
           <p className="text-blue-100 text-sm font-medium mb-1">Operator Dashboard</p>
-          <h1 className="text-3xl font-bold text-white mb-1">{property?.name || "Property"}</h1>
+          <h1 className="text-3xl font-bold text-white mb-1">{property?.legal_name || "Property"}</h1>
           <p className="text-blue-100 text-sm">{property?.metro} · {property?.jurisdiction}</p>
 
           {/* Stats row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
             <StatCard label="Active Leases" value={String(activeLeases.length)} />
             <StatCard label="Total Bookings" value={String(leases.length)} />
-            <StatCard label="Units Occupied" value={`${totalUnitsBooked}/${property?.total_units || 0}`} />
+            <StatCard label="Units Occupied" value={`${totalUnitsBooked}/${property?.unit_count || 0}`} />
             <StatCard label="Network Revenue" value={formatCents(networkRevenue) + "/mo"} />
           </div>
         </div>
@@ -191,7 +191,7 @@ export default function OperatorPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <SettingRow label="Rate Floor" value={formatCents(property?.rate_floor_cents || 0) + "/mo"} />
-                <SettingRow label="Total Units" value={String(property?.total_units || 0)} />
+                <SettingRow label="Total Units" value={String(property?.unit_count || 0)} />
                 <SettingRow label="Max Exposure" value={`${property?.max_network_exposure_pct || 25}%`} />
                 <SettingRow label="Jurisdiction" value={property?.jurisdiction || "—"} />
               </div>
