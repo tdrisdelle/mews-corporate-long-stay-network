@@ -17,6 +17,8 @@ import {
   BarChart3,
   TriangleAlert,
   X,
+  Eye,
+  MapPin,
 } from "lucide-react";
 
 interface Lease {
@@ -28,6 +30,7 @@ interface Lease {
   end_date: string;
   monthly_rent_cents: number;
   unit_count?: number;
+  residents?: { id: string; unit_assignment: string }[];
 }
 
 interface Property {
@@ -85,6 +88,9 @@ export default function OperatorPage() {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
+  const [viewingLease, setViewingLease] = useState<Lease | null>(null);
+  const [panelTravelers, setPanelTravelers] = useState<Record<string, string>>({});
+  const [panelTravelersLoading, setPanelTravelersLoading] = useState(false);
   const [error, setError] = useState("");
 
   const fetchData = useCallback(async () => {
@@ -151,6 +157,24 @@ export default function OperatorPage() {
       }
     }
     doToggle();
+  }
+
+  async function openLeasePanel(lease: Lease) {
+    setViewingLease(lease);
+    setPanelTravelers({});
+    if (lease.residents && lease.residents.length > 0) {
+      setPanelTravelersLoading(true);
+      try {
+        const travelers = await apiGet(`/api/buyers/${lease.buyer_id}/travelers`) as { id: string; full_name: string }[];
+        const map: Record<string, string> = {};
+        for (const t of travelers) map[t.id] = t.full_name;
+        setPanelTravelers(map);
+      } catch {
+        // show IDs if fetch fails
+      } finally {
+        setPanelTravelersLoading(false);
+      }
+    }
   }
 
   const activeLeases = leases.filter((l) => l.state === "active");
@@ -300,41 +324,147 @@ export default function OperatorPage() {
             <div className="divide-y divide-gray-50">
               {leases.map((lease) => (
                 <div key={lease.id} className="px-6 py-4 hover:bg-gray-50/50 transition-colors">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <StateBadge state={lease.state} />
-                        <span className="font-semibold text-gray-900 text-sm">
-                          {buyerNames[lease.buyer_id] || lease.buyer_id.slice(0, 8) + "..."}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-4 mt-1.5 text-xs text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <Calendar size={11} />
-                          {formatDate(lease.start_date)} — {formatDate(lease.end_date)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <DollarSign size={11} />
-                          {formatCents(lease.monthly_rent_cents)}/mo
-                        </span>
-                        {lease.unit_count && (
-                          <span className="flex items-center gap-1">
-                            <Users size={11} />
-                            {lease.unit_count} units
+                  <button onClick={() => openLeasePanel(lease)} className="w-full text-left group">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <StateBadge state={lease.state} />
+                          <span className="font-semibold text-gray-900 text-sm group-hover:text-[#185FA5] transition-colors">
+                            {buyerNames[lease.buyer_id] || lease.buyer_id.slice(0, 8) + "..."}
                           </span>
-                        )}
+                          <Eye size={12} className="text-gray-300 group-hover:text-[#185FA5] opacity-0 group-hover:opacity-100 transition-all" />
+                        </div>
+                        <div className="flex flex-wrap gap-4 mt-1.5 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={11} />
+                            {formatDate(lease.start_date)} — {formatDate(lease.end_date)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <DollarSign size={11} />
+                            {formatCents(lease.monthly_rent_cents)}/mo
+                          </span>
+                          {lease.unit_count && (
+                            <span className="flex items-center gap-1">
+                              <Users size={11} />
+                              {lease.unit_count} units
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-400 font-mono">{lease.id.slice(0, 8)}...</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-400 font-mono">{lease.id.slice(0, 8)}...</p>
-                    </div>
-                  </div>
+                  </button>
                 </div>
               ))}
             </div>
           )}
         </section>
       </div>
+
+      {/* Lease detail panel */}
+      {viewingLease && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setViewingLease(null)} />
+          <div className="relative bg-white rounded-t-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-3">
+                <StateBadge state={viewingLease.state} />
+                <div>
+                  <p className="font-bold text-gray-900 text-lg leading-tight">
+                    {buyerNames[viewingLease.buyer_id] || viewingLease.buyer_id.slice(0, 8) + "..."}
+                  </p>
+                  <p className="text-sm text-gray-500">{property?.legal_name}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewingLease(null)} className="text-gray-400 hover:text-gray-600 shrink-0 ml-3 mt-0.5">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Property</p>
+                <div className="flex items-start gap-2">
+                  <MapPin size={15} className="text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-gray-900">{property?.legal_name}</p>
+                    <p className="text-sm text-gray-500">{property?.metro} · {property?.jurisdiction}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Booking Summary</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-3.5">
+                    <p className="text-xs text-gray-500 mb-1">Check-in</p>
+                    <p className="font-semibold text-gray-900">{formatDate(viewingLease.start_date)}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3.5">
+                    <p className="text-xs text-gray-500 mb-1">Check-out</p>
+                    <p className="font-semibold text-gray-900">{formatDate(viewingLease.end_date)}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3.5">
+                    <p className="text-xs text-gray-500 mb-1">Monthly Rate</p>
+                    <p className="font-semibold text-gray-900">{formatCents(viewingLease.monthly_rent_cents)}/mo</p>
+                  </div>
+                  {viewingLease.unit_count && (
+                    <div className="bg-gray-50 rounded-xl p-3.5">
+                      <p className="text-xs text-gray-500 mb-1">Units</p>
+                      <p className="font-semibold text-gray-900">{viewingLease.unit_count}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {viewingLease.residents && viewingLease.residents.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    Travelers ({viewingLease.residents.length})
+                  </p>
+                  {panelTravelersLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <Loader2 size={14} className="animate-spin" />
+                      Loading travelers...
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {viewingLease.residents.map((r) => (
+                        <div key={r.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                              style={{ backgroundColor: "#185FA5" }}
+                            >
+                              {(panelTravelers[r.id] || "?")[0].toUpperCase()}
+                            </div>
+                            <span className="font-medium text-gray-900 text-sm">
+                              {panelTravelers[r.id] || r.id.slice(0, 8) + "..."}
+                            </span>
+                          </div>
+                          {r.unit_assignment && (
+                            <span className="text-xs bg-white border border-gray-200 text-gray-600 px-2.5 py-1 rounded-lg font-mono">
+                              {r.unit_assignment}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-xs text-gray-400">
+                  Lease ID: <span className="font-mono">{viewingLease.id}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Network participation warning modal */}
       {showNetworkWarning && (() => {
