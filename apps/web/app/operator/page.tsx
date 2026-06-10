@@ -15,6 +15,8 @@ import {
   Loader2,
   AlertCircle,
   BarChart3,
+  TriangleAlert,
+  X,
 } from "lucide-react";
 
 interface Lease {
@@ -82,6 +84,7 @@ export default function OperatorPage() {
   const [buyerNames, setBuyerNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
+  const [showNetworkWarning, setShowNetworkWarning] = useState(false);
   const [error, setError] = useState("");
 
   const fetchData = useCallback(async () => {
@@ -121,9 +124,10 @@ export default function OperatorPage() {
     fetchData();
   }, [fetchData]);
 
-  async function toggleNetworkBookings() {
+  async function doToggle() {
     if (!property) return;
     setToggling(true);
+    setShowNetworkWarning(false);
     try {
       const updated = await apiPatch(`/api/properties/${propertyId}/participation`, {
         accepts_network_bookings: !property.accepts_network_bookings,
@@ -134,6 +138,19 @@ export default function OperatorPage() {
     } finally {
       setToggling(false);
     }
+  }
+
+  function toggleNetworkBookings() {
+    if (!property) return;
+    // Turning off — warn if active or upcoming leases exist
+    if (property.accepts_network_bookings) {
+      const affected = leases.filter((l) => ["active", "signed", "contract_sent"].includes(l.state));
+      if (affected.length > 0) {
+        setShowNetworkWarning(true);
+        return;
+      }
+    }
+    doToggle();
   }
 
   const activeLeases = leases.filter((l) => l.state === "active");
@@ -318,6 +335,60 @@ export default function OperatorPage() {
           )}
         </section>
       </div>
+
+      {/* Network participation warning modal */}
+      {showNetworkWarning && (() => {
+        const affected = leases.filter((l) => ["active", "signed", "contract_sent"].includes(l.state));
+        const activeCount = affected.filter((l) => l.state === "active").length;
+        const upcomingCount = affected.filter((l) => ["signed", "contract_sent"].includes(l.state)).length;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowNetworkWarning(false)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                    <TriangleAlert size={20} className="text-amber-500" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Turn off network participation?</h3>
+                </div>
+                <button onClick={() => setShowNetworkWarning(false)} className="text-gray-400 hover:text-gray-600 shrink-0 ml-2">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-3">
+                Your property currently has{" "}
+                {activeCount > 0 && <strong>{activeCount} active {activeCount === 1 ? "lease" : "leases"}</strong>}
+                {activeCount > 0 && upcomingCount > 0 && " and "}
+                {upcomingCount > 0 && <strong>{upcomingCount} upcoming {upcomingCount === 1 ? "lease" : "leases"}</strong>}
+                {" "}in the network.
+              </p>
+              <p className="text-sm text-gray-600 mb-5">
+                Turning off network participation will <strong>hide this property from new searches</strong>, but all existing leases will continue unaffected. You can re-enable participation at any time.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowNetworkWarning(false)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-gray-700 border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  Keep Active
+                </button>
+                <button
+                  onClick={doToggle}
+                  disabled={toggling}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-60 hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: "#BA7517" }}
+                >
+                  {toggling ? <Loader2 size={14} className="animate-spin" /> : null}
+                  Turn Off Anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
