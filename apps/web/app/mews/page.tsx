@@ -30,13 +30,13 @@ interface Lease {
 
 interface Property {
   id: string;
-  name: string;
+  legal_name: string;
   metro: string;
 }
 
 interface Buyer {
   id: string;
-  name: string;
+  legal_name: string;
 }
 
 const LEASE_STATE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
@@ -119,7 +119,7 @@ export default function MewsPage() {
             try {
               buyerDetails[bid] = await apiGet(`/api/buyers/${bid}`);
             } catch {
-              buyerDetails[bid] = { id: bid, name: bid.slice(0, 8) + "..." };
+              buyerDetails[bid] = { id: bid, legal_name: bid.slice(0, 8) + "..." };
             }
           })
         );
@@ -213,10 +213,10 @@ export default function MewsPage() {
                       <ExternalLink size={12} className="text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
                     </div>
                     <div className="text-sm font-medium text-gray-800 truncate">
-                      {buyer?.name || "Unknown"}
+                      {buyer?.legal_name || "Unknown"}
                     </div>
                     <div className="text-sm text-gray-600 truncate">
-                      {prop?.name || "Unknown"}{prop?.metro ? ` · ${prop.metro}` : ""}
+                      {prop?.legal_name || "Unknown"}{prop?.metro ? ` · ${prop.metro}` : ""}
                     </div>
                     <div className="text-xs text-gray-500">
                       <span className="flex items-center gap-1">
