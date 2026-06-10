@@ -6,8 +6,8 @@ A B2B brokerage marketplace built as a façade on top of the Mews Connector API.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│           Next.js 15 Frontend (port 3000)            │
-│  /booker  /operator  /mews/contracts  /resident      │
+│           Next.js 16 Frontend (port 3000)            │
+│  /booker  /operator  /mews  /mews/contracts  /resident│
 └───────────────────┬─────────────────────────────────┘
                     │ REST
 ┌───────────────────▼─────────────────────────────────┐
@@ -27,23 +27,43 @@ A B2B brokerage marketplace built as a façade on top of the Mews Connector API.
 - **Resident Platform:** https://resident-platform-production.up.railway.app
 - **Mock Mews API:** https://mock-mews-api-production.up.railway.app
 
+## Four Roles, Four Views
+
+| URL | Role | What it shows |
+|-----|------|---------------|
+| `/booker` | Corporate buyer (e.g. Stanford Healthcare) | Search properties, create and manage leases, manage traveler roster |
+| `/operator` | Property operator (e.g. Revisn Nashville) | Incoming bookings, revenue dashboard, network participation toggle |
+| `/mews` | Mews admin | Network-wide lease table, GMV, take-rate revenue |
+| `/mews/contracts/[id]` | Mews admin – contract deep dive | NMA + NPA + individual lease tabs, payment routing, audit trail |
+| `/resident` | Individual traveler (e.g. Maria Santos) | Current stay card, lease document, extension request |
+
 ## 13-Step Demo Flow
 
-Sarah Chen at **Stanford Healthcare Travel Staffing** has 6 travel nurses arriving in Nashville July 15 for 13-week contracts at St. Thomas West Hospital.
+Sarah Chen at **Stanford Healthcare Travel Staffing** needs to place 2 travel nurses in Nashville for a 13-week rotation at St. Thomas West Hospital.
 
-1. Go to `/booker?as=booker&id=a0000000-0000-0000-0000-000000000001`
-2. Search: **Nashville**, July 15 – Oct 14, 6 units
-3. Select **Revisn Nashville** from results (pre-seeded Network property)
-4. Assign 6 nurses: Maria Santos, James Park, Aisha Mohammed, Carlos Reyes, Jennifer Liu, Devon Williams
-5. Click **Create Lease** → lease in `draft` state, US-TN contract generated
-6. Click **Send for Signature** → state `contract_sent` → mock-signed immediately → `signed`
-7. Click **Activate** → platform calls Mews: `companies/add`, `customers/add ×6`, `reservations/add ×6`, `paymentPlans/add` → state `active`
-8. Switch to `/operator?as=operator&id=c0000000-0000-0000-0000-000000000001` → see 6 incoming Network bookings, revenue dashboard
-9. Switch to `/mews/contracts/[lease_id]?as=mews` → NMA + NPA + Individual Lease tabs, payment routing diagram, audit trail
-10. Switch to `/resident?as=resident&id=b0000000-0000-0000-0000-000000000001` → Maria Santos's stay card + lease document
-11. Click **Check In** → Mews `reservations/start` fired
-12. Click **Extend Stay 4 weeks** → new end date, Mews `reservations/updateInterval` fired
-13. Click **Check Out** → Mews `reservations/process` → state `completed`
+1. Open `/booker` — you land as Stanford Healthcare (demo buyer, pre-loaded)
+2. In the search bar set **City/Metro → Nashville**, check-in **Jul 15**, check-out **Oct 14**, **2 units** → click **Search**
+3. Select **Revisn Nashville** from results → click **Create Lease**
+4. In the lease form (Step 1): confirm the property, set dates and monthly rent → click **Next: Assign Travelers**
+5. In Step 2: assign **Aisha Mohammed** to Unit 1 and **Carlos Reyes** to Unit 2 → click **Create Lease** → lease appears in `draft` state below
+6. Click the lease card to open the detail panel → click **Send for Signature** → a 2-second signing animation plays → lease moves to `signed`, US-TN contract timestamped
+7. Click **Activate** → platform calls the Mock Mews API: `companies/add`, `customers/add ×2`, `reservations/add ×2`, `paymentPlans/add` → state becomes `active`
+8. Switch to `/operator` → see the new booking in the **Network Bookings** list alongside historical stays; click any lease card to open a read-only detail panel with traveler names and unit assignments
+9. Switch to `/mews` → **Network Overview** shows all leases across all 5 properties, total GMV, and Mews revenue at 5.5%
+10. Click the lease row → opens `/mews/contracts/[id]` → review NMA, NPA, and the signed individual lease; inspect the payment routing diagram and full audit event trail
+11. Switch to `/resident?as=resident&id=b0000000-0000-0000-0000-000000000001` → Maria Santos's stay card: property name, dates, rent summary, and the simplified lease document
+12. Click **Request Extension** → pick a new end date → Mews `reservations/updateInterval` fires → extension confirmed
+13. Back on `/booker` → open the lease detail panel → click **Check In** (Mews `reservations/start`) → then **Check Out** (Mews `reservations/process`) → state becomes `completed`
+
+## Traveler Management
+
+The booker's **Your Travelers** panel (left side of `/booker`) lets the corporate buyer manage their roster:
+
+- **Add** new travelers (name, email, phone)
+- **Edit** contact info at any time; name is locked once a lease passes `draft`
+- **Delete** travelers not on an active lease (cascades cleanly from all lease assignments)
+- **View booking history** per traveler — clock icon opens a slide-up showing every past, current, and upcoming stay with property, dates, rent, and unit
+- **Overlap protection** — the assignment step warns inline if a traveler is already booked at another property for overlapping dates; the server enforces it with a 409 if the client check is bypassed
 
 ## Run Locally
 
@@ -86,6 +106,24 @@ docker compose up
 curl -X POST http://localhost:8001/admin/seed
 curl -X POST http://localhost:8000/admin/seed
 ```
+
+## Seed Data
+
+The `/admin/seed` endpoint on the Resident Platform loads:
+
+- **3 buyers**: Stanford Healthcare Travel Staffing, Accenture Federal Services, Cigna Healthcare Mobility
+- **12 travelers**: 6 Stanford nurses, 3 Accenture consultants, 3 Cigna relocators
+- **5 properties**: Nashville (US-TN), Dallas (US-TX), Raleigh (US-NC), Phoenix (US-AZ), Boston (US-MA)
+- **13 historical leases**: 10 completed + 3 currently active (~23%), with full contracts, resident assignments, and event histories
+
+## Lease State Machine
+
+```
+draft → signed → active → completed
+                        ↘ cancelled
+```
+
+`contract_sent` is a valid state (returned by the API and shown in the UI) for leases routing through a real e-signature provider. In the current demo, clicking **Send for Signature** advances directly to `signed` with a simulated signing animation.
 
 ## Jurisdictional Contract Library
 

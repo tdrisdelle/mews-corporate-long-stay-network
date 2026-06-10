@@ -60,7 +60,7 @@ interface ContractClause {
 
 interface Property {
   id: string;
-  name: string;
+  legal_name: string;
   metro: string;
   jurisdiction?: string;
 }
@@ -264,7 +264,7 @@ export default function ResidentPage() {
                     <Building2 size={22} className="text-gray-400" />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">{property.name}</p>
+                    <p className="font-semibold text-gray-900">{property.legal_name}</p>
                     <p className="text-sm text-gray-500 flex items-center gap-1">
                       <MapPin size={12} />
                       {property.metro}{property.jurisdiction ? ` · ${property.jurisdiction}` : ""}
@@ -327,7 +327,7 @@ export default function ResidentPage() {
                 <p className="text-xs font-semibold text-gray-500 mb-3">Individual Lease Agreement</p>
                 <div className="space-y-2">
                   {[
-                    { title: "1. Parties", body: `This lease is between you (${displayResident.full_name}) and ${property?.name || "Property"} through Mews Network.` },
+                    { title: "1. Parties", body: `This lease is between you (${displayResident.full_name}) and ${property?.legal_name || "Property"} through Mews Network.` },
                     { title: "2. Term", body: `Your stay runs from ${formatDate(selectedLease.start_date)} to ${formatDate(selectedLease.end_date)}.` },
                     { title: "3. Rent", body: `Monthly rent of ${formatCents(selectedLease.monthly_rent_cents)} is managed by your employer and processed automatically.` },
                     { title: "4. Furnished Unit", body: "Your unit is fully furnished with high-speed internet and standard utilities included." },
@@ -369,7 +369,7 @@ export default function ResidentPage() {
                     className={`w-full px-5 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between gap-3 ${selectedLease?.id === lease.id ? "bg-green-50" : ""}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{prop?.name || "Property"}</p>
+                      <p className="text-sm font-semibold text-gray-800 truncate">{prop?.legal_name || "Property"}</p>
                       <p className="text-xs text-gray-400">{formatDate(lease.start_date)} — {formatDate(lease.end_date)}</p>
                     </div>
                     <StateBadge state={lease.state} />
